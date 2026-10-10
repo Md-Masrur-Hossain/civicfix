@@ -14,6 +14,7 @@ export function SiteHeader() {
       </Link>
       <nav className="main-nav" aria-label="Main navigation">
         <Link href="/issues">Explore reports</Link>
+        <Link className="nav-report" href="/report">Report an issue <span aria-hidden="true">+</span></Link>
         <Link className="nav-admin" href="/admin">Admin preview <span aria-hidden="true">↗</span></Link>
       </nav>
     </header>

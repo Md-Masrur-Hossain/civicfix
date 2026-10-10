@@ -1,5 +1,15 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
+import {
+  IssueStatus,
+  readReviewReports,
+  readSubmittedIssues,
+  readSupportCounts,
+  SubmittedIssue,
+} from "@/lib/issue-storage";
 
 type Issue = {
   id: string;
@@ -11,9 +21,12 @@ type Issue = {
   status: "New" | "In progress" | "Resolved";
   icon: string;
   tone: string;
+  photoDataUrl?: string;
+  isDemo: boolean;
+  sortDate: number;
 };
 
-const issues: Issue[] = [
+const sampleIssues: Issue[] = [
   {
     id: "CF-024",
     category: "Roads & pavements",
@@ -24,6 +37,8 @@ const issues: Issue[] = [
     status: "In progress",
     icon: "↗",
     tone: "peach",
+    isDemo: true,
+    sortDate: 3,
   },
   {
     id: "CF-023",
@@ -35,6 +50,8 @@ const issues: Issue[] = [
     status: "New",
     icon: "✳",
     tone: "yellow",
+    isDemo: true,
+    sortDate: 4,
   },
   {
     id: "CF-021",
@@ -46,14 +63,79 @@ const issues: Issue[] = [
     status: "Resolved",
     icon: "⌂",
     tone: "mint",
+    isDemo: true,
+    sortDate: 7,
   },
 ];
+
+function categoryLabel(category: SubmittedIssue["category"]) {
+  return category.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function submittedIssueToIssue(issue: SubmittedIssue): Issue {
+  const createdAt = new Date(issue.createdAt);
+  return {
+    id: issue.id,
+    category: categoryLabel(issue.category),
+    title: `${categoryLabel(issue.category)} report`,
+    description: issue.description,
+    location: issue.location,
+    date: `Added ${createdAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+    status: "New",
+    icon: "✳",
+    tone: "mint",
+    photoDataUrl: issue.photoDataUrl,
+    isDemo: false,
+    sortDate: createdAt.getTime(),
+  };
+}
 
 function statusClass(status: Issue["status"]) {
   return `status-pill status-${status.toLowerCase().replace(" ", "-")}`;
 }
 
 export default function IssuesPage() {
+  const [submittedIssues, setSubmittedIssues] = useState<SubmittedIssue[]>([]);
+  const [supportCounts, setSupportCounts] = useState<Record<string, number>>({});
+  const [reportStatuses, setReportStatuses] = useState<Record<string, IssueStatus>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [storageError, setStorageError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) {
+        return;
+      }
+      try {
+        setSubmittedIssues(readSubmittedIssues());
+        setReportStatuses(Object.fromEntries(
+          readReviewReports().map((report) => [report.id, report.status]),
+        ));
+        setSupportCounts(readSupportCounts());
+        setStorageError("");
+      } catch (error) {
+        setStorageError(error instanceof Error ? error.message : "Saved reports could not be loaded.");
+      } finally {
+        setIsLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  const allIssues = [
+    ...submittedIssues.map(submittedIssueToIssue),
+    ...sampleIssues,
+  ].map((issue) => ({
+    ...issue,
+    status: reportStatuses[issue.id] ?? issue.status,
+  })).sort((first, second) => second.sortDate - first.sortDate);
+  const demoCount = allIssues.filter((issue) => issue.isDemo).length;
+  const savedCount = allIssues.length - demoCount;
+
   return (
     <>
       <SiteHeader />
@@ -75,23 +157,51 @@ export default function IssuesPage() {
 
         <div className="demo-notice" role="note">
           <span className="notice-icon" aria-hidden="true">i</span>
-          <p><strong>These are made-up sample reports.</strong> Nothing on this page has been submitted to a city service.</p>
+          <p><strong>Browser-only demo.</strong> Sample reports are made up; your reports stay in this browser and are not sent to a city service.</p>
         </div>
 
         <section className="issue-list-section" aria-labelledby="issue-list-title">
           <div className="list-toolbar">
             <div>
               <h2 id="issue-list-title">Around the neighbourhood</h2>
-              <span>{issues.length} sample reports <span className="list-dot">·</span> All categories</span>
+              <span>
+                {isLoading ? "Loading demo reports…" : `${allIssues.length} reports`}
+                {!isLoading && <> <span className="list-dot">·</span> {demoCount} samples, {savedCount} saved here</>}
+              </span>
             </div>
-            <span className="sort-note"><span aria-hidden="true">☷</span> Newest first</span>
+            <Link className="button button-primary issues-report-link" href="/report">Report an issue <span aria-hidden="true">+</span></Link>
           </div>
 
-          {issues.length > 0 ? (
+          {storageError && (
+            <div className="form-message form-error storage-error" role="alert">
+              <span>{storageError}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLoading(true);
+                  setReloadKey((key) => key + 1);
+                }}
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="loading-state" role="status">
+              <span className="loading-spinner" aria-hidden="true" />
+              Loading reports saved in this browser…
+            </div>
+          ) : allIssues.length > 0 ? (
             <div className="issue-list">
-              {issues.map((issue) => (
+              {allIssues.map((issue) => (
                 <article className="issue-card" key={issue.id}>
-                  <div className={`issue-icon ${issue.tone}`} aria-hidden="true">{issue.icon}</div>
+                  {issue.photoDataUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="issue-photo" src={issue.photoDataUrl} alt="Photo attached to this demo report" />
+                  ) : (
+                    <div className={`issue-icon ${issue.tone}`} aria-hidden="true">{issue.icon}</div>
+                  )}
                   <div className="issue-main">
                     <div className="issue-meta">
                       <span className="category-label">{issue.category}</span>
@@ -102,11 +212,14 @@ export default function IssuesPage() {
                     <div className="issue-footer">
                       <span><span aria-hidden="true">⌖</span>{issue.location}</span>
                       <span>{issue.date}</span>
+                      <span className="issue-support-count" aria-label={`${supportCounts[issue.id] ?? 0} browser-only supports`}>
+                        <span aria-hidden="true">♡</span>{supportCounts[issue.id] ?? 0} support{supportCounts[issue.id] === 1 ? "" : "s"}
+                      </span>
                     </div>
                   </div>
                   <div className="issue-status">
                     <span className={statusClass(issue.status)}><i />{issue.status}</span>
-                    <span className="demo-tag">DEMO</span>
+                    <span className="demo-tag">{issue.isDemo ? "SAMPLE" : "BROWSER DEMO"}</span>
                   </div>
                 </article>
               ))}
@@ -115,14 +228,15 @@ export default function IssuesPage() {
             <div className="empty-state">
               <span aria-hidden="true">✳</span>
               <h3>No reports to show yet</h3>
-              <p>When reports are available, they’ll appear here.</p>
+              <p>When demo reports are available, they’ll appear here.</p>
+              <Link className="button button-primary" href="/report">Create a demo report <span aria-hidden="true">↗</span></Link>
             </div>
           )}
         </section>
 
         <section className="issues-bottom-note">
           <span className="note-spark" aria-hidden="true">✳</span>
-          <p>In a future version, residents could support a nearby issue or submit a separate report.</p>
+          <p>Demo reports are private to this browser and are not sent to a municipality or city team.</p>
         </section>
         <div className="inner-page-actions">
           <Link className="text-link" href="/">← Back to home</Link>
