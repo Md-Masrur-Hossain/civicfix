@@ -29,7 +29,7 @@ type Issue = {
 const sampleIssues: Issue[] = [
   {
     id: "CF-024",
-    category: "Roads & pavements",
+    category: "Pothole",
     title: "Pothole near the park entrance",
     description: "A rough patch on the road just before the north gate. Easy to miss after dark.",
     location: "Maple Street · North Park",
@@ -42,7 +42,7 @@ const sampleIssues: Issue[] = [
   },
   {
     id: "CF-023",
-    category: "Street lighting",
+    category: "Broken streetlight",
     title: "Streetlight out on Cedar Lane",
     description: "The light outside the corner shop has been off for a few evenings.",
     location: "Cedar Lane · Block 4",
@@ -55,7 +55,7 @@ const sampleIssues: Issue[] = [
   },
   {
     id: "CF-021",
-    category: "Waste & recycling",
+    category: "Garbage",
     title: "Overflowing bin by the bus stop",
     description: "The public bin is full and some litter has blown onto the pavement.",
     location: "Oak Avenue · Bus stop",

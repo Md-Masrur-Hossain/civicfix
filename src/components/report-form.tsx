@@ -114,7 +114,10 @@ export function ReportForm() {
   }
 
   function saveReport() {
-    if (!category || !photoDataUrl) {
+    const validationErrors = validate();
+    setErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0 || !category || !photoDataUrl) {
+      setMatchOptions(null);
       return;
     }
     setFormError("");
@@ -232,6 +235,7 @@ export function ReportForm() {
             const value = event.target.value;
             setCategory(issueCategories.find((option) => option === value) ?? "");
             setErrors((current) => ({ ...current, category: undefined }));
+            setMatchOptions(null);
           }}
           required
           value={category}
@@ -305,6 +309,7 @@ export function ReportForm() {
           onChange={(event) => {
             setLocation(event.target.value);
             setErrors((current) => ({ ...current, location: undefined }));
+            setMatchOptions(null);
           }}
           placeholder="Street, landmark, or neighbourhood"
           required
